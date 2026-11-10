@@ -1,6 +1,7 @@
 const $ = id => document.getElementById(id);
 const labels={'Agency Profile':'ប្រូហ្វាល់ភ្នាក់ងារ','Content Poster':'រូបភាពសម្រាប់ផុស','មុខទំនិញដែលអាចផុស':'រូបភាពទំនិញ','Video':'វីដេអូ','Video ការប្រើប្រាស់ APP LODA':'វីដេអូណែនាំ','shared':'ភ្នាក់ងារចែកចាយរូបភាព'};
-let branch=false,category=new URLSearchParams(location.search).get('view')==='posters'?'Content Poster':'Agency Profile',limit=24;
+const views=new Map([['posters','Content Poster'],['shared','shared']]);
+let branch=false,category=views.get(new URLSearchParams(location.search).get('view'))||'Agency Profile',limit=24;
 const norm=s=>s.normalize('NFC').replace(/[\s\u200b]+/g,'').toLowerCase();
 function el(tag,text){const node=document.createElement(tag);if(text)node.textContent=text;return node}
 function provinceName(value){
@@ -50,5 +51,15 @@ function render(){
 for(const [key,title] of Object.entries(labels)){const b=el('button',title);b.value=key;b.onclick=()=>{category=key;reset()};$('filters').append(b)}
 function reset(){$('query').value='';limit=24;render()}
 $('library').onclick=()=>{branch=false;reset()};$('directory').onclick=()=>{branch=true;reset()};$('query').oninput=()=>{limit=24;render()};$('more').onclick=()=>{limit+=24;render()};
-if(sharedGalleryURL){const f=el('iframe');f.title=labels.shared;f.src=sharedGalleryURL;$('shared').append(f)}else $('shared').textContent='ការចែកចាយរូបភាពកំពុងរង់ចាំភ្ជាប់ Google Drive។';
+if(sharedGalleryURL){
+ const frame=el('iframe');
+ frame.title=labels.shared;
+ frame.loading='lazy';
+ frame.allow='clipboard-write; web-share';
+ frame.src=sharedGalleryURL;
+ const openGallery=link('បើកបណ្ណាល័យចែកចាយក្នុងផ្ទាំងថ្មី',sharedGalleryURL);
+ openGallery.target='_blank';
+ openGallery.rel='noopener';
+ $('shared').append(frame,openGallery);
+}
 render();
