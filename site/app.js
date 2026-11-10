@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const labels={'Agency Profile':'ប្រូហ្វាល់ភ្នាក់ងារ','Content Poster':'រូបភាពសម្រាប់ផុស','មុខទំនិញដែលអាចផុស':'រូបភាពទំនិញ','Video':'វីដេអូ','Video ការប្រើប្រាស់ APP LODA':'វីដេអូណែនាំ','shared':'ភ្នាក់ងារចែកចាយរូបភាព'};
+const labels={'Agency Profile':'ប្រូហ្វាល់ភ្នាក់ងារ','Content Poster':'រូបភាពសម្រាប់ផុស','មុខទំនិញដែលអាចផុស':'រូបភាពទំនិញ','Video':'វីដេអូ','Video ការប្រើប្រាស់ APP LODA':'វីដេអូណែនាំ','shared':'ចែកចាយរូបភាព និងវីដេអូ'};
 const views=new Map([['posters','Content Poster'],['shared','shared']]);
 let branch=false,category=views.get(new URLSearchParams(location.search).get('view'))||'Agency Profile',limit=24;
 const norm=s=>s.normalize('NFC').replace(/[\s\u200b]+/g,'').toLowerCase();
@@ -54,6 +54,7 @@ $('library').onclick=()=>{branch=false;reset()};$('directory').onclick=()=>{bran
 if(sharedGalleryURL){
  const frame=el('iframe');
  frame.title=labels.shared;
+ frame.style.height='max(85vh, 540px)';
  frame.loading='lazy';
  frame.allow='clipboard-write; web-share';
  frame.src=sharedGalleryURL;
