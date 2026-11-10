@@ -3,6 +3,21 @@ const labels={'Agency Profile':'ប្រូហ្វាល់ភ្នាក់
 let branch=false,category='Agency Profile',limit=24;
 const norm=s=>s.normalize('NFC').replace(/[\s\u200b]+/g,'').toLowerCase();
 function el(tag,text){const node=document.createElement(tag);if(text)node.textContent=text;return node}
+function provinceName(value){
+ const name=norm(value);
+ return name==='ខេត្តកណ្តាល'?'ខេត្តកណ្ដាល':name;
+}
+const provinceLabel=el('label','ជ្រើសរើសខេត្ត ');
+const provinceSelect=el('select');
+provinceSelect.style.cssText='font:inherit;padding:7px 12px;border:1px solid #adc1b0;border-radius:9px;background:white;color:#19482f';
+provinceSelect.add(new Option('ខេត្តទាំងអស់',''));
+const provinces=new Set(catalog.branches.map(item=>provinceName(item.province)).filter(Boolean));
+for(const name of [...provinces].sort((a,b)=>a.localeCompare(b,'km'))){
+ provinceSelect.add(new Option(name,name));
+}
+provinceLabel.append(provinceSelect);
+$('query').after(provinceLabel);
+provinceSelect.onchange=()=>{limit=24;render()};
 function link(label,url){const a=el('a',label);a.href=url;a.className='action';return a}
 function picture(url,name){const i=el('img');i.loading='lazy';i.src=url;i.alt=name;return i}
 function card(item){
@@ -24,7 +39,12 @@ function render(){
  $('query').setAttribute('aria-label',$('query').placeholder);
  $('filters').hidden=branch;const shared=!branch&&category==='shared';$('shared').hidden=!shared;$('query').hidden=shared;
  for(const b of $('filters').children)b.setAttribute('aria-pressed',b.value===category);
- const q=norm($('query').value);const items=(branch?catalog.branches:catalog.media).filter(x=>(branch||x.category===category)&&norm(branch?[x.name,x.code,x.sale,x.province,x.district].join(' '):x.name).includes(q));
+ provinceLabel.hidden=!branch;
+ const q=norm($('query').value);
+ const items=branch?catalog.branches.filter(x=>
+  (!provinceSelect.value||provinceName(x.province)===provinceSelect.value)&&
+  norm([x.name,x.code,x.sale,x.province,x.district].join(' ')).includes(q)
+ ):catalog.media.filter(x=>x.category===category&&norm(x.name).includes(q));
  $('status').textContent=shared?'':items.length+' លទ្ធផល';$('results').classList.toggle('branches',branch);$('results').replaceChildren(...items.slice(0,limit).map(card));$('more').hidden=limit>=items.length
 }
 for(const [key,title] of Object.entries(labels)){const b=el('button',title);b.value=key;b.onclick=()=>{category=key;reset()};$('filters').append(b)}
