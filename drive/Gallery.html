@@ -1,0 +1,8 @@
+<!doctype html><html lang="km"><meta charset="utf-8"><base target="_blank"><style>body{font:16px/1.8 system-ui;color:#214030}button,input{font:inherit;margin:8px}a{color:#18563a}</style><form id="form"><label>រូបភាពសម្រាប់ចែកចាយជាសាធារណៈ (PNG/JPEG · 5 MB)<input required type="file" name="photo" accept="image/png,image/jpeg"></label><button>បង្ហោះរូបភាព</button></form><p id="msg" role="status"></p><ul id="list"></ul><button id="more" hidden>បង្ហាញបន្ថែម</button><script>
+let next='';
+const form=document.querySelector('form'), msg=document.querySelector('#msg'), more=document.querySelector('#more'), list=document.querySelector('#list');
+function fail(err){msg.textContent=err.message;form.querySelector('button').disabled=false;more.disabled=false}
+function load(){more.disabled=true;google.script.run.withFailureHandler(fail).withSuccessHandler(page=>{for(const item of page.items){const a=document.createElement('a');a.href=item.url;a.textContent=item.name;const li=document.createElement('li');li.append(a);list.append(li)}next=page.next;more.hidden=!next;more.disabled=false}).listImages(next)}
+more.onclick=load;
+form.onsubmit=e=>{e.preventDefault();if(form.photo.files[0].size>5242880){msg.textContent='ទំហំអតិបរមា 5 MB';return}form.querySelector('button').disabled=true;msg.textContent='កំពុងបង្ហោះ…';google.script.run.withFailureHandler(fail).withSuccessHandler(name=>{msg.textContent='បានបង្ហោះ '+name;form.reset();form.querySelector('button').disabled=false;next='';list.replaceChildren();load()}).uploadImage(form)};
+load();</script></html>
