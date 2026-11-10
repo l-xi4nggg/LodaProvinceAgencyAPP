@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 const labels={'Agency Profile':'ប្រូហ្វាល់ភ្នាក់ងារ','Content Poster':'រូបភាពសម្រាប់ផុស','មុខទំនិញដែលអាចផុស':'រូបភាពទំនិញ','Video':'វីដេអូ','Video ការប្រើប្រាស់ APP LODA':'វីដេអូណែនាំ','shared':'ភ្នាក់ងារចែកចាយរូបភាព'};
-let branch=false,category='Agency Profile',limit=24;
+let branch=false,category=new URLSearchParams(location.search).get('view')==='posters'?'Content Poster':'Agency Profile',limit=24;
 const norm=s=>s.normalize('NFC').replace(/[\s\u200b]+/g,'').toLowerCase();
 function el(tag,text){const node=document.createElement(tag);if(text)node.textContent=text;return node}
 function provinceName(value){
