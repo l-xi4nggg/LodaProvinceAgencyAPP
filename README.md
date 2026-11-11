@@ -4,7 +4,9 @@ Khmer/English media library and agency directory. Production uses GitHub Pages f
 
 ## Current status
 
-Updated source and a working **local preview** are ready. Nothing has been pushed to GitHub, deployed to Apps Script or uploaded to the live Drive by this work. The existing public deployment is unchanged.
+The updated site is published at https://l-xi4nggg.github.io/LodaProvinceAgencyAPP/ (GitHub Pages run 43040476644 passed source checks and tests). Apps Script deployment version 4 was published on November 11, 2026 using the existing web app URL. The 122 new Agent Logo images are included in the public static catalog.
+
+**Remaining production setup:** the owner must authorize the Drive/external-request scopes, activate Drive API, and configure the two private admin properties. Until that setup is complete, the static library/directory works, but live catalog updates, uploads and admin operations are not ready. No test media has been uploaded to live Drive.
 
 - User page: Khmer by default, English toggle with SVG national flags, saved light/dark mode, media search/download/share, and a desktop directory with list + map.
 - Admin: server-side password verification and signed two-hour sessions; rename, categorize, replace, hide/restore original media and trash uploaded media.
