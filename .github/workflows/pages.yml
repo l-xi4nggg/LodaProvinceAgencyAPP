@@ -18,6 +18,10 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Verify source and backend behavior
+        run: |
+          node scripts/check.cjs
+          node --test tests/*.test.cjs
       - name: Version application scripts for browser caches
         run: sed -i -E "s/(src=\"(data|config|app)\.js)\"/\1?v=$GITHUB_SHA\"/g" site/index.html
       - uses: actions/configure-pages@v5

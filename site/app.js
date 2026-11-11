@@ -1,66 +1,78 @@
-const $ = id => document.getElementById(id);
-const labels={'Agency Profile':'ប្រូហ្វាល់ភ្នាក់ងារ','Content Poster':'រូបភាពសម្រាប់ផុស','មុខទំនិញដែលអាចផុស':'រូបភាពទំនិញ','Video':'វីដេអូ','Video ការប្រើប្រាស់ APP LODA':'វីដេអូណែនាំ','shared':'ចែកចាយរូបភាព និងវីដេអូ'};
-const views=new Map([['posters','Content Poster'],['shared','shared']]);
-let branch=false,category=views.get(new URLSearchParams(location.search).get('view'))||'Agency Profile',limit=24;
-const norm=s=>s.normalize('NFC').replace(/[\s\u200b]+/g,'').toLowerCase();
-function el(tag,text){const node=document.createElement(tag);if(text)node.textContent=text;return node}
-function provinceName(value){
- const name=norm(value);
- return name==='ខេត្តកណ្តាល'?'ខេត្តកណ្ដាល':name;
-}
-const provinceLabel=el('label','ជ្រើសរើសខេត្ត ');
-const provinceSelect=el('select');
-provinceSelect.style.cssText='font:inherit;padding:7px 12px;border:1px solid #adc1b0;border-radius:9px;background:white;color:#19482f';
-provinceSelect.add(new Option('ខេត្តទាំងអស់',''));
-const provinces=new Set(catalog.branches.map(item=>provinceName(item.province)).filter(Boolean));
-for(const name of [...provinces].sort((a,b)=>a.localeCompare(b,'km'))){
- provinceSelect.add(new Option(name,name));
-}
-provinceLabel.append(provinceSelect);
-$('query').after(provinceLabel);
-provinceSelect.onchange=()=>{limit=24;render()};
-function link(label,url){const a=el('a',label);a.href=url;a.className='action';return a}
-function picture(url,name){const i=el('img');i.loading='lazy';i.src=url;i.alt=name;return i}
+'use strict';
+const $=id=>document.getElementById(id), UI=window.LodaUI, t=UI.t;
+const originalMedia=catalog.media.map(item=>({...item,id:'static:'+item.url}));
+const originalBranches=catalog.branches.map((item,index)=>({...item,id:'branch:'+index}));
+const categories=['Agency Profile','Content Poster','មុខទំនិញដែលអាចផុស','Video','Video ការប្រើប្រាស់ APP LODA'];
+const initialView=new URLSearchParams(location.search).get('view');
+let view=initialView==='shared'?'shared':initialView==='directory'?'directory':'library';
+let category=initialView==='posters'?'Content Poster':'Agency Profile',limit=24,liveMedia=originalMedia,liveBranches=originalBranches,overrides={},selectedID='',frameLoaded=false;
+const norm=value=>String(value||'').normalize('NFC').replace(/[\s\u200b]+/g,'').toLowerCase();
+const provinceKey=value=>{const name=String(value||'').normalize('NFC').replace(/[\s\u200b-\u200d]+/g,'');return name==='ខេត្តកណ្តាល'?'ខេត្តកណ្ដាល':name;};
+function el(tag,text){const node=document.createElement(tag);if(text)node.textContent=text;return node;}
+function link(label,url){const node=el('a',label);node.href=url;node.className='action';return node;}
+function picture(url,name){const node=el('img');node.src=url;node.alt=name;node.loading='lazy';return node;}
+function actionButton(text,handler){const node=el('button',text);node.type='button';node.onclick=handler;return node;}
+function mediaURL(item){return new URL(item.url,location.href).href;}
+async function share(name,url){try{if(navigator.share)await navigator.share({title:name,url});else{await navigator.clipboard.writeText(url);$('status').textContent=t('copied');}}catch(error){if(error.name!=='AbortError')prompt(t('share'),url);}}
+function profileFor(branch){const change=overrides['static:'+branch.profile];return change?.deleted?'':change?.thumbnail||change?.url||branch.profile;}
 function card(item){
  const box=el('article');
- if(branch){
-  if(item.profile){const a=link('',item.profile);a.className='side';a.download=item.sale+'.webp';a.append(picture(item.profile,item.sale));box.append(a)}
-  box.append(el('small',[item.province,item.district].filter(Boolean).join(' · ')),el('h2',item.name+'-'+item.code),el('p','លេខទំនាក់ទំនង៖ '+(item.phone||'—')),el('p','Saleman: '+(item.sale||'—')));
-  if(item.map){const b=el('button','ចែករំលែកផែនទី');b.onclick=async()=>{try{if(navigator.share)await navigator.share({title:item.name,url:item.map});else{await navigator.clipboard.writeText(item.map);b.textContent='បានចម្លងតំណ'}}catch(e){if(e.name!=='AbortError')prompt('តំណផែនទី',item.map)}};box.append(b)}
+ if(view==='directory'){
+  box.className='branch-card';box.dataset.selected=String(selectedID===item.id);box.tabIndex=0;
+  const image=profileFor(item);if(image){const node=picture(image,item.name);node.className='branch-photo';box.append(node);}
+  box.append(el('small',[item.province,item.district].filter(Boolean).join(' · ')),el('h2',item.name+' · '+item.code),el('p',t('phone')+': '+(item.phone||'—')),el('p',t('salesperson')+': '+(item.sale||'—')));
+  const controls=el('div');controls.className='media-actions';
+  if(item.map){const open=link(t('openMap'),item.map);open.target='_blank';open.rel='noopener';open.onclick=event=>event.stopPropagation();controls.append(open);}
+  controls.append(actionButton(t('map'),event=>{event.stopPropagation();selectBranch(item);}));box.append(controls);
+  box.onclick=()=>selectBranch(item);box.onkeydown=event=>{if(event.key==='Enter'&&event.target===box)selectBranch(item);};
  }else{
-  if(item.video){const v=el('video');v.controls=true;v.preload='none';v.src=item.url;box.append(v)}else box.append(picture(item.url,item.name));
-  const a=link('ទាញយក ↓',item.url);a.download=item.file;box.append(el('h2',item.name),a)
+  if(item.video&&item.preview){const frame=el('iframe');frame.src=item.preview;frame.title=item.name;frame.loading='lazy';frame.allowFullscreen=true;box.append(frame);}
+  else if(item.video){const video=el('video');video.src=item.url;video.controls=true;video.preload='none';box.append(video);}else box.append(picture(item.thumbnail||item.url,item.name));
+  box.append(el('h2',item.name));const actions=el('div');actions.className='media-actions';
+  const download=link('↓ '+t('download'),item.download||item.url);download.download=item.file;actions.append(download,actionButton(t('share'),()=>share(item.name,mediaURL(item))));box.append(actions);
  }
- return box
+ return box;
+}
+function rebuildProvinces(){const previous=$('province').value;$('province').replaceChildren(new Option(t('allProvinces'),''));for(const name of [...new Set(liveBranches.filter(x=>!x.deleted).map(x=>provinceKey(x.province)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'km')))$('province').add(new Option(name,name));$('province').value=previous;}
+function mapOverview(){const url=new URL('https://www.google.com/maps/d/embed');url.searchParams.set('mid','1WCRIZfzhGtrID6W-3quJbmxNM3WzCJE');url.searchParams.set('hl',UI.lang);url.searchParams.set('ll','12.5657,104.991');url.searchParams.set('z','7');return url.href;}
+function coordinates(item){if(item.lat!=null&&item.lng!=null&&Number.isFinite(Number(item.lat))&&Number.isFinite(Number(item.lng)))return [Number(item.lat),Number(item.lng)];const url=decodeURIComponent(item.map||'');let match=/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/.exec(url);if(!match)match=/(?:@|[?&]q=|\/maps\/search\/)(-?\d+\.\d+),\s*(-?\d+\.\d+)/.exec(url);return match?[Number(match[1]),Number(match[2])]:null;}
+function selectBranch(item){
+ selectedID=item.id;const coords=coordinates(item);$('agencyMap').src=coords?'https://maps.google.com/maps?q='+encodeURIComponent(coords.join(','))+'&z=15&output=embed&hl='+UI.lang:mapOverview();
+ $('selectedBranch').replaceChildren(el('h3',item.name+' · '+item.code),el('p',[item.province,item.district,item.phone].filter(Boolean).join(' · ')));
+ if(item.map){const open=link(t('openMap'),item.map);open.target='_blank';open.rel='noopener';$('selectedBranch').append(open);}
+ render();
+ if(matchMedia('(max-width:850px)').matches&&item.map)window.open(item.map,'_blank','noopener');
 }
 function render(){
- $('library').setAttribute('aria-pressed',!branch);$('directory').setAttribute('aria-pressed',branch);
- $('heading').textContent=branch?'ទីតាំងភ្នាក់ងារឡូដា':'បណ្ណាល័យរូបភាព និងវីដេអូ';
- $('query').placeholder=branch?'ស្វែងរកឈ្មោះទីតាំង កូដឃ្លាំង ឬផ្នែកអ្នកលក់':'ស្វែងរកតាមរយៈផ្នែកអ្នកលក់ "saleman"';
- $('query').setAttribute('aria-label',$('query').placeholder);
- $('filters').hidden=branch;const shared=!branch&&category==='shared';$('shared').hidden=!shared;$('query').hidden=shared;
- for(const b of $('filters').children)b.setAttribute('aria-pressed',b.value===category);
- provinceLabel.hidden=!branch;
- const q=norm($('query').value);
- const items=branch?catalog.branches.filter(x=>
-  (!provinceSelect.value||provinceName(x.province)===provinceSelect.value)&&
-  norm([x.name,x.code,x.sale,x.province,x.district].join(' ')).includes(q)
- ):catalog.media.filter(x=>x.category===category&&norm(x.name).includes(q));
- $('status').textContent=shared?'':items.length+' លទ្ធផល';$('results').classList.toggle('branches',branch);$('results').replaceChildren(...items.slice(0,limit).map(card));$('more').hidden=limit>=items.length
+ const directory=view==='directory',shared=view==='shared';
+ for(const key of ['library','directory','community'])$(key).setAttribute('aria-pressed',String(view===(key==='community'?'shared':key)));
+ $('heading').textContent=t(directory?'directoryTitle':shared?'communityTitle':'libraryTitle');$('intro').textContent=t(directory?'directoryIntro':shared?'communityIntro':'libraryIntro');
+ $('browseControls').hidden=shared;$('shared').hidden=!shared;$('directoryLayout').hidden=shared;$('directoryLayout').classList.toggle('map-layout',directory);$('mapPanel').hidden=!directory;$('province').hidden=!directory;
+ $('filters').hidden=directory;$('query').placeholder=t(directory?'searchBranch':'searchMedia');$('query').setAttribute('aria-label',$('query').placeholder);
+ $('filters').replaceChildren(...categories.map(key=>{const node=actionButton(t(key),()=>{category=key;limit=24;render();});node.setAttribute('aria-pressed',String(category===key));return node;}));
+ const query=norm($('query').value),items=directory?liveBranches.filter(item=>!item.deleted&&(!$('province').value||provinceKey(item.province)===$('province').value)&&norm([item.name,item.code,item.sale,item.province,item.district].join(' ')).includes(query)):liveMedia.filter(item=>!item.deleted&&item.category===category&&norm(item.name).includes(query));
+ $('results').classList.toggle('branches',directory);$('results').replaceChildren(...items.slice(0,limit).map(card));$('status').textContent=items.length+' '+t('results');$('empty').hidden=!!items.length;$('more').hidden=limit>=items.length;
+ if(directory&&!$('agencyMap').getAttribute('src'))$('agencyMap').src=mapOverview();
+ if(shared&&!frameLoaded){const url=new URL(sharedGalleryURL);url.searchParams.set('lang',UI.lang);url.searchParams.set('theme',UI.theme);url.searchParams.set('embed','1');$('sharedFrame').src=url.href;frameLoaded=true;}
 }
-for(const [key,title] of Object.entries(labels)){const b=el('button',title);b.value=key;b.onclick=()=>{category=key;reset()};$('filters').append(b)}
-function reset(){$('query').value='';limit=24;render()}
-$('library').onclick=()=>{branch=false;reset()};$('directory').onclick=()=>{branch=true;reset()};$('query').oninput=()=>{limit=24;render()};$('more').onclick=()=>{limit+=24;render()};
-if(sharedGalleryURL){
- const frame=el('iframe');
- frame.title=labels.shared;
- frame.style.height='max(85vh, 540px)';
- frame.loading='lazy';
- frame.allow='clipboard-write; web-share';
- frame.src=sharedGalleryURL;
- const openGallery=link('បើកបណ្ណាល័យចែកចាយក្នុងផ្ទាំងថ្មី',sharedGalleryURL);
- openGallery.target='_blank';
- openGallery.rel='noopener';
- $('shared').append(frame,openGallery);
+function changeView(value){view=value;limit=24;$('query').value='';render();trackVisit(value==='shared'?'gallery':value);}
+$('library').onclick=()=>changeView('library');$('directory').onclick=()=>changeView('directory');$('community').onclick=()=>changeView('shared');$('query').oninput=()=>{limit=24;render();};$('province').onchange=()=>{limit=24;render();};$('more').onclick=()=>{limit+=24;render();};
+$('resetMap').onclick=()=>{selectedID='';$('agencyMap').src=mapOverview();$('selectedBranch').replaceChildren();render();};
+if(sharedGalleryURL){const admin=new URL(sharedGalleryURL);admin.searchParams.set('view','admin');$('adminLink').href=admin.href;$('openShared').href=sharedGalleryURL;}
+function syncEmbeddedPreferences(){if(!frameLoaded)return;const data={type:'loda:preferences',lang:UI.lang,theme:UI.theme};function send(frame,depth){if(depth>3)return;try{frame.postMessage(data,'*');for(let i=0;i<frame.frames.length;i++)send(frame.frames[i],depth+1);}catch(_){}}send($('sharedFrame').contentWindow,0);}
+$('sharedFrame').onload=syncEmbeddedPreferences;
+window.addEventListener('loda:preferences',()=>{rebuildProvinces();render();syncEmbeddedPreferences();if(view==='directory'&&!selectedID)$('agencyMap').src=mapOverview();});
+let request='',timer,remoteMedia=[],script,generation=0;
+function applySnapshot(snapshot){
+ overrides=snapshot.overrides||{};const changes=snapshot.branchOverrides||{};liveBranches=originalBranches.map(item=>({...item,...changes[item.id]}));
+ for(const [id,change]of Object.entries(changes))if(id.startsWith('new:')&&change.name)liveBranches.push({...change,id});
+ const known=new Set(remoteMedia.map(item=>item.id));remoteMedia.push(...(snapshot.items||[]).filter(item=>!known.has(item.id)));liveMedia=[...originalMedia.map(item=>({...item,...overrides[item.id]})),...remoteMedia];rebuildProvinces();render();
 }
-render();
+function requestUpdates(page=''){
+ if(!sharedGalleryURL)return;request=Date.now()+'-'+(++generation);const url=new URL(sharedGalleryURL);url.searchParams.set('mode','catalog');url.searchParams.set('request',request);if(page)url.searchParams.set('page',page);
+ script?.remove();script=el('script');script.src=url.href;
+ const fail=()=>{clearTimeout(timer);script?.remove();$('syncStatus').replaceChildren(el('span',t('syncError')+' '),actionButton(t('retry'),()=>{remoteMedia=[];requestUpdates();}));};script.onerror=fail;timer=setTimeout(fail,30000);document.body.append(script);
+}
+window.lodaCatalogUpdates=snapshot=>{if(snapshot.request!==request)return;clearTimeout(timer);script?.remove();applySnapshot(snapshot);$('syncStatus').textContent=snapshot.next?t('loading'):'';if(snapshot.next)requestUpdates(snapshot.next);};
+function trackVisit(page){try{let session=sessionStorage.getItem('loda:visit');if(!session){session=crypto.randomUUID();sessionStorage.setItem('loda:visit',session);}const url=new URL(sharedGalleryURL);url.searchParams.set('mode','visit');url.searchParams.set('session',session);url.searchParams.set('event',crypto.randomUUID());url.searchParams.set('page',page);const beacon=el('script');beacon.src=url.href;beacon.onload=beacon.onerror=()=>beacon.remove();document.body.append(beacon);}catch(_){} }
+rebuildProvinces();render();requestUpdates();trackVisit(view==='shared'?'gallery':view);
